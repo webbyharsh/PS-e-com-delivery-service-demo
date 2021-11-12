@@ -1,0 +1,71 @@
+deployment:
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  image:
+    name: gcr.io/loblaws-ecommerce-training/delivery-service
+    tag: latest
+    pullPolicy: Always
+  livenessProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    failureThreshold: 4
+    successThreshold: 1
+    timeoutSeconds: 2
+    endpoint: actuator/health
+    port: 9006
+  readinessProbe:
+    initialDelaySeconds: 60
+    periodSeconds: 10
+    failureThreshold: 5
+    successThreshold: 1
+    timeoutSeconds: 5
+    endpoint: actuator/health
+    port: 9006
+  terminationGracePeriodSeconds: 15
+
+service:
+  type: NodePort
+  port: 9006
+  targetPort: 9006
+env:
+  SPRING_PROFILES_ACTIVE: dev
+  javaOpts: "-XX:+UseG1GC -Xms128m -Xmx128m"
+
+serviceAccount:
+  name: notification-service-sa
+  create: true
+
+hpa:
+  replicas:
+    min: 1
+    max: 3
+  metrics:
+    targetCpuUsage: 85
+
+owner: "pcx"
+
+nameOverride: ""
+fullnameOverride: ""
+
+securityContext:
+  enabled: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 3000
+  fsGroup: 2000
+
+## jvm heap settings
+jvm:
+  heap:
+    min: 256m
+    max: 256m
+    
+pubsubSvcAccount:
+  key:
+

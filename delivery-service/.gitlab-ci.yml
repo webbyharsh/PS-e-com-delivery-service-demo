@@ -1,0 +1,66 @@
+stages:
+  - build
+#  - test
+  - docker
+  - deploy
+
+variables:
+  REGION: asia-south1-c
+  PROJECT: loblaws-ecommerce-training
+  CLUSTER_NAME: ecommerce-training
+
+
+maven-build:
+  image: maven:3-jdk-8
+  stage: build
+  script: "mvn clean package -Denv=test"
+  artifacts:
+    paths:
+      - target/*.jar
+
+#maven-test:
+#  image: maven:3-jdk-8
+#  stage: test
+#  script: "mvn test"
+#  artifacts:
+#    paths:
+#      - target/*.jar
+
+package-app:
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  stage: docker
+  dependencies:
+    - maven-build
+  variables:
+    CI_REGISTRY_IMAGE: gcr.io/loblaws-ecommerce-training/delivery-service
+  script:
+    - mkdir -p /kaniko
+    - ls target
+    - if [ -z "$service_account_key" ]; then echo "SVC Account is NULL"; else echo "SVC Account is Not NULL"; fi;
+    - echo "$service_account_key" | base64 -d > /kaniko/config.json
+    - export GOOGLE_APPLICATION_CREDENTIALS="/kaniko/config.json"
+    - /kaniko/executor --context $CI_PROJECT_DIR --dockerfile=$CI_PROJECT_DIR/Dockerfile --destination=$CI_REGISTRY_IMAGE:$CI_PIPELINE_ID
+
+.gcloud:
+  before_script:
+    - gcloud config set compute/zone $REGION
+    - gcloud config set project $PROJECT
+    - mkdir -p /.config/gcloud/
+    - if [ -z "$service_account_key" ]; then echo "SVC Account is NULL"; else echo "SVC Account is Not NULL"; fi;
+    - echo "$service_account_key" | base64 -d > /.config/gcloud/service_account.json
+    - export GOOGLE_APPLICATION_CREDENTIALS="/.config/gcloud/service_account.json"
+    - gcloud auth activate-service-account --key-file="/.config/gcloud/service_account.json"
+    - gcloud auth configure-docker
+    - gcloud auth list
+
+deploy:
+  extends:
+    - .gcloud
+  image: gcr.io/loblaws-ecommerce-training/helm3:latest
+  stage: deploy
+  script:
+    - gcloud beta container clusters get-credentials $CLUSTER_NAME --region $REGION --project $PROJECT
+    - helm upgrade --install delivery-service helm/delivery-service --namespace delivery-service --values helm/delivery-service/values.yaml --set deployment.image.tag=$CI_PIPELINE_ID --set pubsubSvcAccount.key=$PUB_SUB_READ_WRITE_ENCODED_KEY --wait --timeout 900s --history-max 20
+  allow_failure: false
