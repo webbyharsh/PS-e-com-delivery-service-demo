@@ -1,4 +1,4 @@
-# Loblaws Ecommerce Training
+#  Ecommerce Training
 ## _Delivery Service_
 
 [![Build Status](https://travis-ci.org/joemccann/dillinger.svg?branch=master)](https://pscode.lioncloud.net/ecommerce-training-ground/delivery-service/-/pipelines)
